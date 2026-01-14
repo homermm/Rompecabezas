@@ -2,10 +2,6 @@
 
 Juego de rompecabezas online con piezas que encajan entre sí. Arrastra las piezas para armar la imagen.
 
-## Demo
-
-[Ver demo en vivo](https://tu-url-aqui.com)
-
 ## Características
 
 - Piezas con bordes redondeados que encajan entre sí
