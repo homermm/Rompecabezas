@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/puzzle-icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Rompecabezas online moderno con piezas encastrables. Arrastra y conecta las piezas para armar la imagen."
+    />
+    <title>Rompecabezas | Jigsaw Puzzle</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Loading Overlay -->
+      <div id="loading-overlay" class="overlay" style="display: none">
+        <div class="loader">
+          <div class="spinner"></div>
+          <p>Cargando puzzle...</p>
+        </div>
+      </div>
+
+      <!-- Header -->
+      <header class="header">
+        <div class="header-left">
+          <h1 class="logo">🧩 Rompecabezas</h1>
+        </div>
+        <div class="header-center">
+          <div class="timer">
+            <span class="timer-icon">⏱️</span>
+            <span id="timer-display">00:00</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <button id="sound-toggle" class="icon-btn active" title="Sonido">
+            🔊
+          </button>
+          <button
+            id="fullscreen-btn"
+            class="icon-btn"
+            title="Pantalla completa"
+          >
+            ⛶
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Game Area -->
+      <main class="main-container">
+        <!-- Left Panel - Controls -->
+        <aside class="controls-panel">
+          <div class="panel-section">
+            <h3>Nueva Partida</h3>
+            <select id="difficulty-select" class="select-input">
+              <!-- Options added by JS -->
+            </select>
+            <button id="new-image-btn" class="btn btn-primary">
+              Nueva Imagen
+            </button>
+          </div>
+
+          <div class="panel-section">
+            <h3>Imagen</h3>
+            <div class="thumbnail-container">
+              <img id="thumbnail" alt="Puzzle preview" />
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h3>Herramientas</h3>
+            <button id="ghost-toggle" class="btn btn-secondary">
+              <span>👻</span> Imagen Guía
+            </button>
+            <button id="shuffle-btn" class="btn btn-secondary">
+              <span>🔀</span> Mezclar Piezas
+            </button>
+            <button id="new-game-action" class="btn btn-danger">
+              <span>🔄</span> Reiniciar
+            </button>
+          </div>
+        </aside>
+
+        <!-- Game Canvas -->
+        <div id="game-area" class="game-area">
+          <canvas id="game-canvas"></canvas>
+        </div>
+      </main>
+
+      <!-- Continue Dialog -->
+      <dialog id="continue-dialog" class="dialog">
+        <div class="dialog-content">
+          <h2>¡Bienvenido de nuevo!</h2>
+          <p>Tienes un puzzle guardado. ¿Deseas continuar?</p>
+          <div class="dialog-actions">
+            <button id="continue-btn" class="btn btn-primary">Continuar</button>
+            <button id="new-game-btn" class="btn btn-secondary">
+              Nuevo Juego
+            </button>
+          </div>
+        </div>
+      </dialog>
+
+      <!-- Complete Dialog -->
+      <dialog id="complete-dialog" class="dialog">
+        <div class="dialog-content celebration">
+          <h2>🎉 ¡Felicidades! 🎉</h2>
+          <p>Has completado el puzzle</p>
+          <div class="stats">
+            <div class="stat">
+              <span class="stat-label">Tiempo</span>
+              <span id="final-time" class="stat-value">00:00</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Piezas</span>
+              <span id="final-pieces" class="stat-value">0</span>
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button id="play-again-btn" class="btn btn-primary">
+              Jugar de Nuevo
+            </button>
+          </div>
+        </div>
+      </dialog>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
