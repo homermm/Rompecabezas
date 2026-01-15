@@ -41,6 +41,7 @@ export class JigsawGame {
   
   private isPanning: boolean = false;
   private panStart: { x: number; y: number } = { x: 0, y: 0 };
+  private isPaused: boolean = false;
 
   constructor() {
     this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -247,11 +248,14 @@ export class JigsawGame {
       this.startNewGame();
     };
     
-    // Shuffle
-    document.getElementById('shuffle-btn')!.onclick = () => this.shufflePieces();
+    // Pause toggle
+    document.getElementById('pause-btn')!.onclick = () => this.togglePause();
     
     // Reset zoom
     document.getElementById('reset-zoom-btn')!.onclick = () => this.resetView();
+    
+    // Organize pieces
+    document.getElementById('organize-btn')!.onclick = () => this.organizePieces();
     
     // Ghost image toggle
     document.getElementById('ghost-toggle')!.onclick = () => {
@@ -325,8 +329,14 @@ export class JigsawGame {
     const x = (clientX - this.canvasOffset.x) / this.zoom;
     const y = (clientY - this.canvasOffset.y) / this.zoom;
     
-    // Right click or middle click = start panning
+    // Right click or middle click = start panning (allowed even when paused)
     if (e.button === 2 || e.button === 1) {
+      this.startPan(clientX, clientY);
+      return;
+    }
+    
+    // If paused, only allow panning on empty area
+    if (this.isPaused) {
       this.startPan(clientX, clientY);
       return;
     }
@@ -475,14 +485,19 @@ export class JigsawGame {
     this.render();
   }
 
-  private shufflePieces(): void {
-    audioService.play('shuffle');
+  private togglePause(): void {
+    this.isPaused = !this.isPaused;
+    const btn = document.getElementById('pause-btn')!;
     
-    // Only scatter pieces without breaking groups
-    this.scatterPiecesOnBoard();
-    
-    this.render();
-    this.saveGame();
+    if (this.isPaused) {
+      timerService.pause();
+      btn.textContent = '▶️';
+      btn.title = 'Continuar';
+    } else {
+      timerService.start();
+      btn.textContent = '⏸️';
+      btn.title = 'Pausar';
+    }
   }
 
   private resetView(): void {
@@ -492,6 +507,125 @@ export class JigsawGame {
       y: (this.canvas.height - IMAGE_HEIGHT) / 2
     };
     this.render();
+  }
+
+  private organizePieces(): void {
+    const pieceWidth = IMAGE_WIDTH / this.difficulty.cols;
+    const pieceHeight = IMAGE_HEIGHT / this.difficulty.rows;
+    const spacing = pieceWidth * 0.35;
+    
+    const largestGroupId = this.findLargestGroupId();
+    
+    const loosePieces = this.pieces.filter(p => p.groupId !== largestGroupId);
+    const processedGroups = new Set<number>();
+    const groupsToPlace: { groupId: number; pieces: Piece[] }[] = [];
+    
+    loosePieces.forEach(piece => {
+      if (processedGroups.has(piece.groupId)) return;
+      processedGroups.add(piece.groupId);
+      
+      const group = groupManager.getGroup(piece.groupId);
+      const groupPieces = group 
+        ? this.pieces.filter(p => group.pieceIds.has(p.id))
+        : [piece];
+      
+      groupsToPlace.push({ groupId: piece.groupId, pieces: groupPieces });
+    });
+    
+    // Shuffle groups randomly so they're not in order
+    for (let i = groupsToPlace.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [groupsToPlace[i], groupsToPlace[j]] = [groupsToPlace[j], groupsToPlace[i]];
+    }
+    
+    // Generate spiral positions around the center
+    const positions = this.generateRectangularSpiral(groupsToPlace.length, pieceWidth, pieceHeight, spacing);
+    
+    groupsToPlace.forEach(({ pieces }, index) => {
+      if (index >= positions.length) return;
+      
+      const anchorPiece = pieces[0];
+      const { x: targetX, y: targetY } = positions[index];
+      
+      const dx = targetX - anchorPiece.position.x;
+      const dy = targetY - anchorPiece.position.y;
+      
+      pieces.forEach(p => {
+        p.position.x += dx;
+        p.position.y += dy;
+      });
+    });
+    
+    this.resetView();
+    this.saveGame();
+  }
+
+  private generateRectangularSpiral(count: number, pieceW: number, pieceH: number, spacing: number): { x: number; y: number }[] {
+    const positions: { x: number; y: number }[] = [];
+    const stepX = pieceW + spacing;
+    const stepY = pieceH + spacing;
+    
+    // Center of the puzzle
+    const centerX = IMAGE_WIDTH / 2;
+    const centerY = IMAGE_HEIGHT / 2;
+    
+    // Start position just outside the puzzle area
+    let ring = 1;
+    
+    while (positions.length < count) {
+      const halfW = IMAGE_WIDTH / 2 + ring * stepX;
+      const halfH = IMAGE_HEIGHT / 2 + ring * stepY;
+      
+      // Top edge (left to right)
+      const topY = centerY - halfH;
+      for (let x = centerX - halfW; x <= centerX + halfW && positions.length < count; x += stepX) {
+        positions.push({ x, y: topY });
+      }
+      
+      // Right edge (top to bottom)
+      const rightX = centerX + halfW;
+      for (let y = centerY - halfH + stepY; y <= centerY + halfH && positions.length < count; y += stepY) {
+        positions.push({ x: rightX, y });
+      }
+      
+      // Bottom edge (right to left)
+      const bottomY = centerY + halfH;
+      for (let x = centerX + halfW - stepX; x >= centerX - halfW && positions.length < count; x -= stepX) {
+        positions.push({ x, y: bottomY });
+      }
+      
+      // Left edge (bottom to top)
+      const leftX = centerX - halfW;
+      for (let y = centerY + halfH - stepY; y >= centerY - halfH + stepY && positions.length < count; y -= stepY) {
+        positions.push({ x: leftX, y });
+      }
+      
+      ring++;
+    }
+    
+    return positions;
+  }
+
+  private findLargestGroupId(): number {
+    const groupSizes = new Map<number, number>();
+    
+    this.pieces.forEach(piece => {
+      const group = groupManager.getGroup(piece.groupId);
+      const size = group ? group.pieceIds.size : 1;
+      groupSizes.set(piece.groupId, size);
+    });
+    
+    let largestId = -1;
+    let largestSize = 0;
+    
+    groupSizes.forEach((size, id) => {
+      if (size > largestSize) {
+        largestSize = size;
+        largestId = id;
+      }
+    });
+    
+    return largestId;
   }
 
   private render(): void {
