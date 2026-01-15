@@ -250,6 +250,7 @@ export class JigsawGame {
     
     // Pause toggle
     document.getElementById('pause-btn')!.onclick = () => this.togglePause();
+    document.getElementById('resume-btn')!.onclick = () => this.togglePause();
     
     // Reset zoom
     document.getElementById('reset-zoom-btn')!.onclick = () => this.resetView();
@@ -488,15 +489,19 @@ export class JigsawGame {
   private togglePause(): void {
     this.isPaused = !this.isPaused;
     const btn = document.getElementById('pause-btn')!;
+    const overlay = document.getElementById('pause-overlay')!;
     
     if (this.isPaused) {
       timerService.pause();
       btn.textContent = '▶️';
       btn.title = 'Continuar';
+      document.getElementById('pause-time')!.textContent = timerService.formatTime(timerService.getElapsedTime());
+      overlay.style.display = 'flex';
     } else {
       timerService.start();
       btn.textContent = '⏸️';
       btn.title = 'Pausar';
+      overlay.style.display = 'none';
     }
   }
 

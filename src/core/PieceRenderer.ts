@@ -77,16 +77,25 @@ export class PieceRenderer {
     
     ctx.restore();
     
-    // Draw piece outline
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.lineWidth = 1;
+    // Draw drop shadow for depth
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke(path);
+    ctx.restore();
+    
+    // Draw white outline for contrast on dark backgrounds
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = 1.5;
     ctx.stroke(path);
     
-    // Add subtle shadow/highlight effect
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-    ctx.shadowBlur = 3;
-    ctx.shadowOffsetX = 1;
-    ctx.shadowOffsetY = 1;
+    // Draw inner subtle dark line for definition
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.lineWidth = 0.5;
     ctx.stroke(path);
     
     return canvas;
