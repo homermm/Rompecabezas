@@ -35,6 +35,12 @@ export class JigsawGame {
   private isComplete: boolean = false;
   
   private canvasOffset: { x: number; y: number } = { x: 0, y: 0 };
+  private zoom: number = 1;
+  private readonly MIN_ZOOM = 0.3;
+  private readonly MAX_ZOOM = 2;
+  
+  private isPanning: boolean = false;
+  private panStart: { x: number; y: number } = { x: 0, y: 0 };
 
   constructor() {
     this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -215,6 +221,7 @@ export class JigsawGame {
     this.canvas.addEventListener('mouseup', this.onCanvasMouseUp.bind(this));
     this.canvas.addEventListener('mouseleave', this.onCanvasMouseUp.bind(this));
     this.canvas.addEventListener('wheel', this.onCanvasWheel.bind(this));
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     
     // Window resize
     window.addEventListener('resize', this.resizeCanvas.bind(this));
@@ -242,6 +249,9 @@ export class JigsawGame {
     
     // Shuffle
     document.getElementById('shuffle-btn')!.onclick = () => this.shufflePieces();
+    
+    // Reset zoom
+    document.getElementById('reset-zoom-btn')!.onclick = () => this.resetView();
     
     // Ghost image toggle
     document.getElementById('ghost-toggle')!.onclick = () => {
@@ -310,8 +320,16 @@ export class JigsawGame {
 
   private onCanvasMouseDown(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left - this.canvasOffset.x;
-    const y = e.clientY - rect.top - this.canvasOffset.y;
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    const x = (clientX - this.canvasOffset.x) / this.zoom;
+    const y = (clientY - this.canvasOffset.y) / this.zoom;
+    
+    // Right click or middle click = start panning
+    if (e.button === 2 || e.button === 1) {
+      this.startPan(clientX, clientY);
+      return;
+    }
     
     // Check for piece click (reverse order to get top piece first)
     for (let i = this.pieces.length - 1; i >= 0; i--) {
@@ -321,13 +339,27 @@ export class JigsawGame {
         return;
       }
     }
+    
+    // Click on empty area = start panning
+    this.startPan(clientX, clientY);
   }
 
   private onCanvasMouseMove(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    
+    if (this.isPanning) {
+      this.canvasOffset.x += clientX - this.panStart.x;
+      this.canvasOffset.y += clientY - this.panStart.y;
+      this.panStart = { x: clientX, y: clientY };
+      this.render();
+      return;
+    }
+    
     if (this.isDragging && this.draggedPiece) {
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left - this.canvasOffset.x;
-      const y = e.clientY - rect.top - this.canvasOffset.y;
+      const x = (clientX - this.canvasOffset.x) / this.zoom;
+      const y = (clientY - this.canvasOffset.y) / this.zoom;
       
       this.moveDraggedPieces(x - this.dragOffset.x, y - this.dragOffset.y);
       this.render();
@@ -335,14 +367,37 @@ export class JigsawGame {
   }
 
   private onCanvasMouseUp(_e: MouseEvent): void {
+    if (this.isPanning) {
+      this.isPanning = false;
+      return;
+    }
+    
     if (this.isDragging && this.draggedPiece) {
       this.endDrag();
     }
   }
 
+  private startPan(x: number, y: number): void {
+    this.isPanning = true;
+    this.panStart = { x, y };
+  }
+
   private onCanvasWheel(e: WheelEvent): void {
     e.preventDefault();
-    // Wheel disabled - no panning
+    
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const oldZoom = this.zoom;
+    const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+    this.zoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, this.zoom * zoomDelta));
+    
+    const zoomRatio = this.zoom / oldZoom;
+    this.canvasOffset.x = mouseX - (mouseX - this.canvasOffset.x) * zoomRatio;
+    this.canvasOffset.y = mouseY - (mouseY - this.canvasOffset.y) * zoomRatio;
+    
+    this.render();
   }
 
   private startDrag(piece: Piece, x: number, y: number): void {
@@ -352,7 +407,26 @@ export class JigsawGame {
       x: x - piece.position.x,
       y: y - piece.position.y
     };
-    // No pickup sound per user request
+    
+    this.bringToFront(piece);
+  }
+
+  private bringToFront(piece: Piece): void {
+    const group = groupManager.getGroup(piece.groupId);
+    const groupPieceIds = group ? group.pieceIds : new Set([piece.id]);
+    
+    const otherPieces: Piece[] = [];
+    const groupPieces: Piece[] = [];
+    
+    this.pieces.forEach(p => {
+      if (groupPieceIds.has(p.id)) {
+        groupPieces.push(p);
+      } else {
+        otherPieces.push(p);
+      }
+    });
+    
+    this.pieces = [...otherPieces, ...groupPieces];
   }
 
   private moveDraggedPieces(newX: number, newY: number): void {
@@ -411,6 +485,15 @@ export class JigsawGame {
     this.saveGame();
   }
 
+  private resetView(): void {
+    this.zoom = 1;
+    this.canvasOffset = {
+      x: (this.canvas.width - IMAGE_WIDTH) / 2,
+      y: (this.canvas.height - IMAGE_HEIGHT) / 2
+    };
+    this.render();
+  }
+
   private render(): void {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -420,6 +503,7 @@ export class JigsawGame {
     
     ctx.save();
     ctx.translate(this.canvasOffset.x, this.canvasOffset.y);
+    ctx.scale(this.zoom, this.zoom);
     
     // Draw ghost image if enabled
     if (this.showGhostImage && imageService.getLoadedImage()) {
